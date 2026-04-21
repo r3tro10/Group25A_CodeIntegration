@@ -11,7 +11,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.FileWriter;
 
-public class mainClass {
+public class SeachForLight {
     private static SwiftBotAPI robot;
     private static int thresholdValue;
     private static int motorSpeed;
