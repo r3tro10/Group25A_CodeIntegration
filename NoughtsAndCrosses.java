@@ -5,12 +5,12 @@ import swiftbot.*;
 public class NoughtsAndCrosses {
 	static SwiftBotAPI swiftbot;
 
-	public static void main(String[] args) {
+	public void startTask(SwiftBotAPI sharedBot, Scanner sharedScanner) {
 		
 		// 3x3 board to store game state
 	    char[][] board = new char[3][3];
 	    // scanner used for all user input
-	    Scanner input = new Scanner(System.in);
+	    Scanner input = sharedScanner;
 
 	    System.out.print("Enter your name: ");
 	    String userName = input.nextLine();
@@ -30,12 +30,7 @@ public class NoughtsAndCrosses {
 	    // controls whether the game keeps looping
 	    boolean playing = true;
 	    
-	    try {
-	        swiftbot = SwiftBotAPI.INSTANCE;
-	    } catch (Exception e) {
-	        System.out.println("SwiftBot not available.");
-	        System.exit(5);
-	    }
+	    swiftbot = sharedBot;
 
 	    System.out.println("SwiftBot connected");
 	    System.out.println("Welcome " + userName);
@@ -164,8 +159,15 @@ public class NoughtsAndCrosses {
 	        }
 	        roundNumber++;
 	    }
+	    
+	    try {
+	        swiftbot.disableUnderlights();
+	    } catch (Exception e) {
+	        System.out.println("Cleanup error");
+	    }
 
-	    input.close();
+	    return;
+
 	}
 	
 	// fills the board with empty spaces at the start of each round
