@@ -117,16 +117,15 @@ public class MainMenu {
     }
 
     private static void runNoughtsAndCrosses(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        NoughtsAndCrosses.startTask(swiftBotInstance, scanner);
+        runTaskPlaceholder("Noughts and Crosses", swiftBotInstance, scanner);
     }
 
     private static void runDrawShape(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        DrawShapesSwiftBot task = new DrawShapesSwiftBot();
-        task.startTask(swiftBotInstance, scanner);
+        runTaskPlaceholder("Draw Shape", swiftBotInstance, scanner);
     }
 
     private static void runSpyBot(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        runTaskPlaceholder("SpyBot", swiftBotInstance, scanner);
+        Spybot.startTask(swiftBotInstance, scanner);
     }
 
     private static void runZigZag(SwiftBotAPI swiftBotInstance, Scanner scanner) {
