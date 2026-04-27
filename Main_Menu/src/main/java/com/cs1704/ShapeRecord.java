@@ -1,4 +1,4 @@
-
+package com.cs1704;
 public class ShapeRecord {
 
     private final String type;
