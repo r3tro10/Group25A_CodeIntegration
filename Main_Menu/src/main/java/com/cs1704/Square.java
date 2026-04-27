@@ -1,3 +1,4 @@
+package com.cs1704;
 public class Square {
 
     private final int sideLength;
