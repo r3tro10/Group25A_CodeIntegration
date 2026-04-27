@@ -1,4 +1,4 @@
-
+package com.cs1704;
 public class Triangle {
 
     private final int a;
