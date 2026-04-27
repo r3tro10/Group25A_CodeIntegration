@@ -1,3 +1,4 @@
+package com.cs1704;
 import java.awt.image.BufferedImage;
 import swiftbot.*;
 import java.util.Scanner;
