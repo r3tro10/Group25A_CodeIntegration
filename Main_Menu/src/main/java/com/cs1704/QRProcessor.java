@@ -1,3 +1,5 @@
+package com.cs1704;
+
 public class QRProcessor {
 
     public static String[] parseShapes(String qrData) {
