@@ -1,0 +1,485 @@
+import swiftbot.SwiftBotAPI;
+import swiftbot.Button;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Random;
+import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class SnakesAndLadders {
+
+    // ---------------------------------------------------------------
+    // BOARD
+    // ---------------------------------------------------------------
+    static final int BOARD_SIZE = 25;
+    static final int GRID_SIZE  = 5;
+
+    // 2D matrix - boustrophedon (snake) numbering
+    static final int[][] BOARD = {
+        { 1,  2,  3,  4,  5},
+        {10,  9,  8,  7,  6},
+        {11, 12, 13, 14, 15},
+        {20, 19, 18, 17, 16},
+        {21, 22, 23, 24, 25}
+    };
+
+    // Snakes: [0]=head [1]=tail
+    static final int[][] SNAKES = {
+        {17,  7},
+        {23,  4}
+    };
+
+    // Ladders: [0]=bottom [1]=top
+    static final int[][] LADDERS = {
+        { 4, 14},
+        { 9, 20}
+    };
+
+    // ---------------------------------------------------------------
+    // ROBOT MOVEMENT TIMINGS — TUNE THESE FOR YOUR ROBOT
+    // ---------------------------------------------------------------
+    // MOVE_MS:  how long (ms) to drive forward to cross one 25cm square
+    //           increase if robot stops short, decrease if it overshoots
+    static final int MOVE_MS   = 900;
+
+    // TURN_90:  how long (ms) to spin on the spot to turn exactly 90 degrees
+    //           increase if robot under-turns, decrease if it over-turns
+    static final int TURN_90   = 550;
+
+    // DRIVE_SPD: forward speed (0-100). Lower = more accurate but slower
+    static final int DRIVE_SPD = 60;
+
+    // TURN_SPD:  spinning speed (0-100). Lower = more accurate turns
+    static final int TURN_SPD  = 50;
+
+    // ---------------------------------------------------------------
+    // STATE
+    // ---------------------------------------------------------------
+    static SwiftBotAPI api     = SwiftBotAPI.INSTANCE;
+    static Scanner     scanner = new Scanner(System.in);
+    static Random      rng     = new Random();
+
+
+
+    // ---------------------------------------------------------------
+    // MAIN
+    // ---------------------------------------------------------------
+    public static void main(String[] args) {
+
+        System.out.println("==========================================");
+        System.out.println("    SNAKES AND LADDERS  -  SwiftBot       ");
+        System.out.println("==========================================");
+        System.out.println("Press button Y on the SwiftBot to begin.");
+
+        // Wait for Y button
+        AtomicBoolean started = new AtomicBoolean(false);
+        api.enableButton(Button.Y, () -> {
+            started.set(true);
+            flashGreen(3);
+        });
+        while (!started.get()) pause(100);
+        api.disableButton(Button.Y);
+        System.out.println("Game started!\n");
+
+        // Get player name
+        String playerName = prompt("Enter your name: ");
+        String botName    = "SwiftBot";
+        System.out.println("Welcome, " + playerName + "! You are playing against " + botName + ".\n");
+
+        // Show snakes and ladders
+        showSnakesAndLadders();
+
+        // Choose mode
+        System.out.println("Choose a game mode:");
+        System.out.println("  Mode A - Normal game");
+        System.out.println("  Mode B - You can override the SwiftBot's dice roll (up to 5 squares)");
+        String mode = "";
+        while (!mode.equals("a") && !mode.equals("b")) {
+            mode = prompt("Enter A or B: ").toLowerCase();
+            if (!mode.equals("a") && !mode.equals("b"))
+                System.out.println("Invalid. Please enter A or B.");
+        }
+        System.out.println("Mode " + mode.toUpperCase() + " selected.\n");
+
+        // Roll to decide who goes first
+        System.out.println("Rolling to decide who goes first...");
+        int pRoll, bRoll;
+        do {
+            pRoll = rollDie();
+            bRoll = rollDie();
+            System.out.println("  " + playerName + " rolled: " + pRoll);
+            System.out.println("  " + botName    + " rolled: " + bRoll);
+            if (pRoll == bRoll) System.out.println("  Tie! Rolling again...");
+        } while (pRoll == bRoll);
+
+        boolean playerFirst = pRoll > bRoll;
+        System.out.println((playerFirst ? playerName : botName) + " goes first!\n");
+
+        // Start the game
+        playGame(playerName, botName, mode, playerFirst);
+    }
+
+    // ---------------------------------------------------------------
+    // GAME LOOP
+    // ---------------------------------------------------------------
+    static void playGame(String playerName, String botName, String mode, boolean playerFirst) {
+
+        int playerPos  = 1;
+        int botPos     = 1;
+        boolean playerTurn = playerFirst;
+
+        AtomicBoolean quitPressed = new AtomicBoolean(false);
+        api.enableButton(Button.X, () -> quitPressed.set(true));
+
+        while (true) {
+
+            // Check win conditions
+            if (playerPos == BOARD_SIZE) {
+                System.out.println("\n*** " + playerName + " WINS! Congratulations! ***");
+                break;
+            }
+            if (botPos == BOARD_SIZE) {
+                System.out.println("\n*** " + botName + " WINS! Better luck next time! ***");
+                break;
+            }
+
+            // --- PLAYER TURN ---
+            if (playerTurn) {
+                System.out.println("\n[" + playerName + "'s turn] Press button A to roll the die.");
+                waitForA();
+
+                int die  = rollDie();
+                int from = playerPos;
+                int to   = from + die;
+
+                if (to > BOARD_SIZE) {
+                    System.out.println("[" + playerName + "] rolled a [" + die + "] - cannot move (would exceed square 25).");
+                } else {
+                    playerPos = to;
+                    System.out.println("[" + playerName + "] rolled a [" + die + "] and moved from square [" + from + "] to [" + playerPos + "].");
+                    playerPos = checkSnakesLadders(playerPos, playerName);
+                }
+
+                printBoardState(playerPos, botPos, playerName, botName);
+
+            // --- BOT TURN ---
+            } else {
+                System.out.println("\n[" + botName + "'s turn]");
+                pause(800);
+
+                int die  = rollDie();
+                int from = botPos;
+
+                System.out.println("[" + botName + "] rolled a [" + die + "].");
+
+                int to;
+                if (mode.equals("b")) {
+                    System.out.println("Mode B: Enter 1-5 to override the move, or 0 to accept the roll:");
+                    int override = readInt(0, 5);
+                    if (override == 0) {
+                        to = from + die;
+                        System.out.println("Accepted roll. " + botName + " moves " + die + " squares.");
+                    } else {
+                        to = from + override;
+                        System.out.println("Override! Moving " + botName + " " + override + " squares.");
+                    }
+                } else {
+                    to = from + die;
+                }
+
+                if (to > BOARD_SIZE) {
+                    System.out.println("[" + botName + "] cannot move (would exceed square 25).");
+                } else {
+                    int prevPos = botPos;
+                    botPos = to;
+                    System.out.println("[" + botName + "] moved from square [" + from + "] to [" + botPos + "].");
+                    driveRobot(prevPos, botPos);
+                    int afterSpecial = checkSnakesLadders(botPos, botName);
+                    if (afterSpecial != botPos) {
+                        driveRobot(botPos, afterSpecial);
+                        botPos = afterSpecial;
+                    }
+                }
+
+                printBoardState(playerPos, botPos, playerName, botName);
+            }
+
+            // Check quit opportunity at square 5
+            if (playerPos == 5 || botPos == 5) {
+                System.out.println("A player is on square 5! Press X within 5 seconds to quit.");
+                if (waitForX(5000, quitPressed)) {
+                    api.disableButton(Button.X);
+                    saveLog(playerName, botName, playerPos, botPos);
+                    return;
+                }
+            }
+
+            playerTurn = !playerTurn;
+        }
+
+        // Quit opportunity at square 25
+        System.out.println("Press X within 5 seconds to save and quit.");
+        waitForX(5000, quitPressed);
+        api.disableButton(Button.X);
+        saveLog(playerName, botName, playerPos, botPos);
+    }
+
+    // ---------------------------------------------------------------
+    // SNAKES AND LADDERS CHECK
+    // ---------------------------------------------------------------
+    static int checkSnakesLadders(int pos, String name) {
+        for (int[] snake : SNAKES) {
+            if (pos == snake[0]) {
+                System.out.println("  SNAKE! " + name + " slides from " + pos + " down to " + snake[1] + "!");
+                return snake[1];
+            }
+        }
+        for (int[] ladder : LADDERS) {
+            if (pos == ladder[0]) {
+                System.out.println("  LADDER! " + name + " climbs from " + pos + " up to " + ladder[1] + "!");
+                return ladder[1];
+            }
+        }
+        return pos;
+    }
+
+    // ---------------------------------------------------------------
+    // DISPLAY
+    // ---------------------------------------------------------------
+    static void showSnakesAndLadders() {
+        System.out.println("-----------------------------------------");
+        System.out.println("SNAKES (head -> tail):");
+        for (int[] s : SNAKES)
+            System.out.println("  Square " + s[0] + "  ->  Square " + s[1]);
+        System.out.println("LADDERS (bottom -> top):");
+        for (int[] l : LADDERS)
+            System.out.println("  Square " + l[0] + "  ->  Square " + l[1]);
+        System.out.println("Place the marker cards on the board now.");
+        System.out.println("-----------------------------------------\n");
+    }
+
+    static void printBoardState(int playerPos, int botPos, String playerName, String botName) {
+        System.out.println();
+        for (int[] row : BOARD) {
+            System.out.print("| ");
+            for (int sq : row) {
+                String cell;
+                if      (sq == playerPos && sq == botPos) cell = "PB";
+                else if (sq == playerPos)                 cell = "P ";
+                else if (sq == botPos)                    cell = "B ";
+                else                                      cell = String.format("%02d", sq);
+                System.out.print(cell + " | ");
+            }
+            System.out.println();
+        }
+        System.out.println("(P)=" + playerName + "  (B)=" + botName);
+        System.out.println(playerName + ": square " + playerPos + "   " + botName + ": square " + botPos + "\n");
+    }
+
+    // ---------------------------------------------------------------
+    // ROBOT MOVEMENT
+    //
+    // HOW THE PATH WORKS:
+    // Row 1: squares  1-5  travel EAST  (left to right)
+    // Row 2: squares  6-10 travel WEST  (right to left)
+    // Row 3: squares 11-15 travel EAST
+    // Row 4: squares 16-20 travel WEST
+    // Row 5: squares 21-25 travel EAST
+    // Between rows the robot turns and moves NORTH one square.
+    //
+    // The robot always knows what direction it is currently facing
+    // (robotDir) and turns the shortest way to face the new direction.
+    //
+    // TUNE THESE VALUES AT THE TOP OF THE FILE:
+    //   MOVE_MS   = time in ms to cross one 25cm square going forward
+    //   TURN_90   = time in ms to spin exactly 90 degrees on the spot
+    //   DRIVE_SPD = forward motor speed (0-100)
+    //   TURN_SPD  = turning motor speed (0-100)
+    // ---------------------------------------------------------------
+
+    // Current robot facing direction: 0=EAST 1=NORTH 2=WEST 3=SOUTH
+    static int robotDir = 0;  // starts facing EAST on square 1
+
+    static void driveRobot(int from, int to) {
+        if (from == to) return;
+        int step = from < to ? 1 : -1;
+        int cur  = from;
+        while (cur != to) {
+            int next = cur + step;
+            moveOneSquare(cur, next);
+            cur = next;
+        }
+    }
+
+    static void moveOneSquare(int from, int to) {
+        // Work out which direction we need to face for this step
+        int needed = directionNeeded(from, to);
+        // Turn to face that direction
+        turnToFace(needed);
+        // Drive forward exactly one square
+        api.move(DRIVE_SPD, DRIVE_SPD, MOVE_MS);
+        pause(300);
+    }
+
+    // Returns which of the 4 directions (0=E,1=N,2=W,3=S) the robot
+    // must face to move from square 'from' to adjacent square 'to'.
+    static int directionNeeded(int from, int to) {
+        int fromRow = rowOf(from);
+        int toRow   = rowOf(to);
+
+        // Moving up to the next row = face NORTH
+        if (toRow > fromRow) return 1;
+
+        // Moving down to the previous row = face SOUTH
+        if (toRow < fromRow) return 3;
+
+        // Same row - which way do squares increase on this row?
+        // Odd rows (1,3,5): squares go left to right = EAST
+        // Even rows (2,4):  squares go right to left = WEST
+        if (fromRow % 2 == 1) {
+            return to > from ? 0 : 2;  // EAST or WEST
+        } else {
+            return to > from ? 2 : 0;  // WEST or EAST
+        }
+    }
+
+    // Turns the robot to face targetDir using the shortest rotation.
+    static void turnToFace(int targetDir) {
+        if (targetDir == robotDir) return; // already facing right way
+
+        int diff = (targetDir - robotDir + 4) % 4;
+
+        if (diff == 1) {
+            // 90 degrees left
+            turnLeft90();
+        } else if (diff == 3) {
+            // 90 degrees right
+            turnRight90();
+        } else if (diff == 2) {
+            // 180 degrees - do two right turns
+            turnRight90();
+            turnRight90();
+        }
+
+        robotDir = targetDir;
+    }
+
+    // Spins the robot 90 degrees to the LEFT on the spot.
+    // Left motor goes backward, right motor goes forward.
+    static void turnLeft90() {
+        api.move(-TURN_SPD, TURN_SPD, TURN_90);
+        pause(300);
+    }
+
+    // Spins the robot 90 degrees to the RIGHT on the spot.
+    // Left motor goes forward, right motor goes backward.
+    static void turnRight90() {
+        api.move(TURN_SPD, -TURN_SPD, TURN_90);
+        pause(300);
+    }
+
+    static int rowOf(int square) {
+        return (int) Math.ceil((double) square / GRID_SIZE);
+    }
+
+    // ---------------------------------------------------------------
+    // BUTTON HELPERS
+    // ---------------------------------------------------------------
+    static void waitForA() {
+        AtomicBoolean pressed = new AtomicBoolean(false);
+        api.disableAllButtons();
+        api.setButtonLight(Button.A, true);
+        api.enableButton(Button.A, () -> {
+            pressed.set(true);
+            api.setButtonLight(Button.A, false);
+        });
+        while (!pressed.get()) pause(100);
+        api.disableButton(Button.A);
+    }
+
+    static boolean waitForX(long ms, AtomicBoolean flag) {
+        flag.set(false);
+        long end = System.currentTimeMillis() + ms;
+        while (System.currentTimeMillis() < end && !flag.get()) pause(100);
+        return flag.get();
+    }
+
+    // ---------------------------------------------------------------
+    // LOG FILE
+    // ---------------------------------------------------------------
+    static void saveLog(String playerName, String botName, int playerPos, int botPos) {
+        String ts   = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd.HH.mm.ss"));
+        String path = System.getProperty("user.dir") + "/snakes_ladders_" + ts + ".txt";
+        try (PrintWriter pw = new PrintWriter(new FileWriter(path))) {
+            pw.println("=== Snakes and Ladders Log ===");
+            pw.println("Date/Time : " + ts);
+            pw.println();
+            pw.println("Player positions:");
+            pw.println("  " + playerName + " : square " + playerPos);
+            pw.println("  " + botName    + " : square " + botPos);
+            pw.println();
+            pw.println("Snakes (head -> tail):");
+            for (int[] s : SNAKES) pw.println("  " + s[0] + " -> " + s[1]);
+            pw.println("Ladders (bottom -> top):");
+            for (int[] l : LADDERS) pw.println("  " + l[0] + " -> " + l[1]);
+        } catch (IOException e) {
+            System.out.println("Could not write log: " + e.getMessage());
+            return;
+        }
+        System.out.println("Log saved to: " + path);
+        api.disableAllButtons();
+        api.disableButtonLights();
+        api.disableUnderlights();
+        api.stopMove();
+    }
+
+    // ---------------------------------------------------------------
+    // UTILITIES
+    // ---------------------------------------------------------------
+    static int rollDie() {
+        return rng.nextInt(6) + 1;
+    }
+
+    static String prompt(String message) {
+        System.out.print(message);
+        String line = scanner.nextLine().trim();
+        while (line.isEmpty()) {
+            System.out.print("Input cannot be empty. " + message);
+            line = scanner.nextLine().trim();
+        }
+        return line;
+    }
+
+    static int readInt(int min, int max) {
+        while (true) {
+            try {
+                int val = Integer.parseInt(scanner.nextLine().trim());
+                if (val >= min && val <= max) return val;
+                System.out.println("Please enter a number between " + min + " and " + max + ":");
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Enter a number between " + min + " and " + max + ":");
+            }
+        }
+    }
+
+    static void pause(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    static void flashGreen(int times) {
+        for (int i = 0; i < times; i++) {
+            api.fillUnderlights(new int[]{0, 255, 0});
+            pause(300);
+            api.disableUnderlights();
+            pause(300);
+        }
+    }
+}
