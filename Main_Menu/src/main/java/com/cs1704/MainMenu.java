@@ -117,7 +117,7 @@ public class MainMenu {
     }
 
     private static void runNoughtsAndCrosses(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        runTaskPlaceholder("Noughts and Crosses", swiftBotInstance, scanner);
+        NoughtsAndCrosses.startTask(swiftBotInstance, scanner);
     }
 
     private static void runDrawShape(SwiftBotAPI swiftBotInstance, Scanner scanner) {
