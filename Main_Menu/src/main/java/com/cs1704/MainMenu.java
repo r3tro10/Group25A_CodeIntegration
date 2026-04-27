@@ -121,7 +121,7 @@ public class MainMenu {
     }
 
     private static void runDrawShape(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        DrawShapes task = new DrawShapesSwiftBot();
+        DrawShapesSwiftBot task = new DrawShapesSwiftBot();
         task.startTask(swiftBotInstance, scanner);
     }
 
