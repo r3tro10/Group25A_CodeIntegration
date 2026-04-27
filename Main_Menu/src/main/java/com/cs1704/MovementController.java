@@ -1,3 +1,4 @@
+package com.cs1704;
 import swiftbot.SwiftBotAPI;
 
 public class MovementController {
