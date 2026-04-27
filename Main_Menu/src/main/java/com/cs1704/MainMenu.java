@@ -108,7 +108,8 @@ public class MainMenu {
     }
 
     private static void runSearchForLight(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        runTaskPlaceholder("Search For Light", swiftBotInstance, scanner);
+        SearchForLight task = new SearchForLight();
+        task.startTask(swiftBotInstance, scanner);
     }
 
     private static void runDance(SwiftBotAPI swiftBotInstance, Scanner scanner) {
