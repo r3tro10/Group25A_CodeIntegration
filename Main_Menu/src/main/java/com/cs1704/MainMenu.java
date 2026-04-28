@@ -133,7 +133,7 @@ public class MainMenu {
     }
 
     private static void runMasterMind(SwiftBotAPI swiftBotInstance, Scanner scanner) {
-        runTaskPlaceholder("Master Mind", swiftBotInstance, scanner);
+        MasterMind.startTask(swiftBotInstance, scanner);
     }
 
     private static void runTaskPlaceholder(String taskName, SwiftBotAPI swiftBotInstance, Scanner scanner) {
